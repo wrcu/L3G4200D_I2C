@@ -1,5 +1,5 @@
 /*from bilal0052*/
-
+//#include "stm32f4xx_gpio.h"
 #include <stdio.h>
 #include "stm32f4xx.h"
 #include "stm32f4xx_i2c.h"
@@ -18,13 +18,22 @@
 #define OUT_Z_L                         0x2C
 #define OUT_Z_H                         0x2D
 #define L3G4200D_ADDR                   (105<<1)
-
+#define gyro_sensitivity_250                8.75   
 uint8_t i2cdata,a1,a2;
-int16_t gyroX, gyroY, gyroZ;
+uint8_t gyrox_h_temp , gyrox_l_temp , gyroy_h_temp , gyroy_l_temp , gyroz_h_temp , gyroz_l_temp;
+__IO int16_t gyrox_init;
+__IO int16_t gyroy_init;
+__IO int16_t gyroz_init;
+__IO int16_t gyrox_temp, gyroy_temp, gyroz_temp;
+__IO float gyrox , gyroy , gyroz;
+__IO int16_t gyrox_decimal , gyroy_decimal , gyroz_decimal;
+__IO int16_t gyrox_int , gyroy_int , gyroz_int;
 
-//uint8_t I2C_write(uint8_t devAddr, uint8_t regAddr, uint8_t val);
-//uint8_t I2C_readreg(uint8_t devAddr, uint8_t regAddr);
+float gyrox_angle , gyroy_angle , gyroz_angle;
+int16_t gyrox_angle_int , gyroy_angle_int , gyroz_angle_int;
+int16_t gyrox_angle_decimal , gyroy_angle_decimal , gyroz_angle_decimal;
 void USART3_Config(void);
+
 
 void init_I2C1(void)
 {
@@ -122,38 +131,67 @@ uint8_t I2C_readreg(uint8_t devAddr, uint8_t regAddr)
 
 void sensor_ayarla()
 {
-    I2C_write(L3G4200D_ADDR, CTRL_REG1, 0x0F);  
-    I2C_write(L3G4200D_ADDR, CTRL_REG2, 0x00); 
-    I2C_write(L3G4200D_ADDR, CTRL_REG3, 0x08); 
-    I2C_write(L3G4200D_ADDR, CTRL_REG4, 0x30);
-    I2C_write(L3G4200D_ADDR, CTRL_REG5, 0x00);
+    	I2C_write(L3G4200D_ADDR, CTRL_REG1, 0x0F);  
+    	I2C_write(L3G4200D_ADDR, CTRL_REG2, 0x00); 
+    	I2C_write(L3G4200D_ADDR, CTRL_REG3, 0x00); 
+    	I2C_write(L3G4200D_ADDR, CTRL_REG4, 0x00);
+    	I2C_write(L3G4200D_ADDR, CTRL_REG5, 0x00);
 }
 
 int main(void)
 {
-    int i;
-    USART3_Config();
-    SystemInit();
-    init_I2C1();
-    sensor_ayarla();
-    printf("l3g4200d\r\n");
-   // while (1){
+    	int i;
+    	USART3_Config();	
+   	SysTick_Init();
+    	init_I2C1();
+    	sensor_ayarla();
+    	printf("l3g4200d\r\n");
+    	while (1){
 
-    if((I2C_readreg(L3G4200D_ADDR,STATUS_REG)&0x08)==0x08) 
-    {
-        a1=I2C_readreg(L3G4200D_ADDR,OUT_X_L);
-        a2=I2C_readreg(L3G4200D_ADDR,OUT_X_H);
-        gyroX=((a2<<8) | a1);
-        a1=I2C_readreg(L3G4200D_ADDR,OUT_Y_L);
-        a2=I2C_readreg(L3G4200D_ADDR,OUT_Y_H);
-        gyroY=((a2<<8) | a1);
+    		if((I2C_readreg(L3G4200D_ADDR,STATUS_REG)&0x08)==0x08) 
+    		{
+        		gyrox_l_temp=I2C_readreg(L3G4200D_ADDR,OUT_X_L);
+        		gyrox_h_temp=I2C_readreg(L3G4200D_ADDR,OUT_X_H);
+        		gyrox_temp=((gyrox_h_temp << 8) | gyrox_l_temp);
 
-        a1=I2C_readreg(L3G4200D_ADDR,OUT_Z_L);
-        a2=I2C_readreg(L3G4200D_ADDR,OUT_Z_H);
-        gyroZ=((a2<<8) | a1);
+        		gyroy_l_temp=I2C_readreg(L3G4200D_ADDR,OUT_Y_L);
+        		gyroy_h_temp=I2C_readreg(L3G4200D_ADDR,OUT_Y_H);
+        		gyroy_temp=((gyroy_h_temp << 8) | gyroy_l_temp);
 
+        		gyroz_l_temp=I2C_readreg(L3G4200D_ADDR,OUT_Z_L);
+        		gyroz_h_temp=I2C_readreg(L3G4200D_ADDR,OUT_Z_H);
+        		gyroz_temp=((gyroz_h_temp << 8) | gyroz_l_temp);
+			printf("gyrox_temp=%d   gyroy_temp=%d   gyroz_temp=%d\r\n",gyrox_temp,gyroy_temp,gyroz_temp);
 
-	printf("gyrox=%d   gyroy=%d   gyroz=%d\n",gyroX,gyroY,gyroZ);
+			
+
+			gyrox = gyrox_temp * gyro_sensitivity_250 /1000 ;  
+			gyroy = gyroy_temp * gyro_sensitivity_250 /1000 ;
+			gyroz = gyroz_temp * gyro_sensitivity_250 /1000 ;
+			
+			
+			gyrox_int = (int16_t)gyrox;
+			gyrox_decimal = (gyrox - gyrox_int)*1000;
+			if(gyrox_decimal < 0)
+				gyrox_decimal=-gyrox_decimal;
+
+			gyroy_int = (int16_t)gyroy;
+			gyroy_decimal = (gyroy - gyroy_int)*1000;
+			if(gyroy_decimal < 0)
+				gyroy_decimal=-gyroy_decimal;
+
+			gyroz_int = (int16_t)gyroz;
+			gyroz_decimal = (gyroz - gyroz_int)*1000;
+			if(gyroz_decimal < 0)
+				gyroz_decimal=-gyroz_decimal;
+
+			printf("gyrox_float=%d.%d\r\n",gyrox_int,gyrox_decimal);
+			printf("gyroy_float=%d.%d\r\n",gyroy_int,gyroy_decimal);
+			printf("gyroz_float=%d.%d\r\n",gyroz_int,gyroz_decimal);
+
+ 			
+			printf("\r\n-------------------------------------------------------\r\n");
+			Delay(1000);
     }
-   // }
+   }
 }
